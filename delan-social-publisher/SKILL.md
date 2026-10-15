@@ -1,6 +1,6 @@
 ---
 name: delan-social-publisher
-description: 为德缆 DLFLEX / Delan Cable 从 https://en.delancable.com/product 随机或指定选择一个产品，生成有官网依据的英文 B2B 文案与无元数据四宫格图片，并发布到 Facebook 主页 dlflexdelancable。用于德缆产品社媒发布、素材预演和明确指定批次的续跑；仅含 Facebook，不含站内文章或 LinkedIn。
+description: 为德缆 DLFLEX / Delan Cable 从官网随机或指定选品，生成有依据的英文文案与四宫格图片，发布到 Facebook 主页 dlflexdelancable 并回写 Google 发布记录表。用于产品发布、素材预演、明确批次续跑或已发布帖子的表格补录；不含站内文章或 LinkedIn 发布。
 ---
 
 # 德缆 Facebook 自动发布
@@ -11,7 +11,7 @@ description: 为德缆 DLFLEX / Delan Cable 从 https://en.delancable.com/produc
 - 唯一发布主页：`https://www.facebook.com/dlflexdelancable`
 - 品牌：DLFLEX / Delan Cable（德缆）。以当前官网产品事实为准。
 - 用户调用本技能要求发布，且未指定 `dry-run` / 仅预览时，视为授权通过预检后直接发布，无需再次询问常规确认。仅要求创建、修改或审阅技能不构成执行发布的授权。
-- 不创建站内文章、LinkedIn 帖子、网站 API 请求或定时任务。不需要网站 API key。不沿用参考技能要求三渠道链接的 Google Sheet；本技能使用本地 manifest 和发布清单。只有用户另行指定表格及列结构时才增加表格回写。
+- 不创建站内文章、LinkedIn 帖子、网站 API 请求或定时任务。不需要网站 API key。每次成功发布后必须回写指定 Google 表格；站内和 LinkedIn 两列填写“不适用”，详见 [references/reporting.md](references/reporting.md)。
 
 ## 运行步骤
 
@@ -21,7 +21,7 @@ description: 为德缆 DLFLEX / Delan Cable 从 https://en.delancable.com/produc
 
 Live 运行在生成图片前打开指定主页，核实主页 URL、可见品牌、当前发布身份与创建帖子权限。主页数字 ID 未预设；若平台重定向到数字 ID，必须通过当前页面证据确认与 `dlflexdelancable` 对应并记录，不得借用其他品牌 ID。允许一次明确的主页身份切换及其确认。遇到登录、MFA、CAPTCHA、身份歧义或权限不足立即停止。
 
-确认输出目录和图像生成工具可用。`dry-run` 不要求 Facebook 登录，不打开发布编辑器，不执行提交；其余取证、文案和图片检查相同。图像生成前加载已安装的 `imagegen` 技能。
+确认输出目录和图像生成工具可用。Live 运行同时读取 [references/reporting.md](references/reporting.md)，检查表格访问与五列表头。`dry-run` 不要求 Facebook 登录，不打开发布编辑器，不执行提交或表格写入；其余取证、文案和图片检查相同。图像生成前加载已安装的 `imagegen` 技能。
 
 ### 2. 选择和核实产品
 
@@ -83,14 +83,25 @@ python3 scripts/update_manifest.py MANIFEST --status pending --submission-starte
 ```bash
 python3 scripts/update_manifest.py MANIFEST --status published --url PUBLIC_POST_URL \
   --evidence RUN_DIR/evidence/facebook-publication.json
+```
+
+结果不确定时记录 `uncertain`，先核对平台状态；没有确证帖子不存在就不可重发。详见发布规范的一次有界重试。已发布批次不可降级或重复发布。
+
+### 5. 回写表格并完成核验
+
+按 [references/reporting.md](references/reporting.md) 把本次记录写入 `social-auto-upload` 的 `工作表1`。用 Facebook 永久链接去重，写入后回读核对五列值和唯一性，保存真实连接器结果并执行：
+
+```bash
+python3 scripts/record_reporting.py MANIFEST --status reported \
+  --evidence RUN_DIR/evidence/google-sheet-verification.json
 python3 scripts/validate_completion.py MANIFEST
 ```
 
-只有最终守卫输出 `complete` 才算完成。结果不确定时记录 `uncertain`，先核对平台状态；没有确证帖子不存在就不可重发。详见发布规范的一次有界重试。验证完成后可删除临时 JPEG，保留 WebP、哈希记录和证据；未完成时保留 JPEG 以便安全续跑。已发布批次不可降级或重复发布。
+只有最终守卫输出 `complete` 才算完成。表格回写失败时保留 Facebook `published`，报告表格状态并只补录，不重发帖子。补录旧批次直接从本节开始。验证完成后可删除临时 JPEG，保留 WebP、哈希记录和证据；未完成时保留 JPEG 以便安全续跑。
 
 ## 交付
 
-在本次运行目录写 `report.md`，并返回简短中文发布清单：产品名和官网链接、Facebook 状态和永久链接、尝试及跳过的候选数与原因、素材目录和台账链接。明确区分 `dry-run`、`blocked`、`failed`、`uncertain` 和 `complete`。没有已验证的公开链接时不得宣称发布成功。
+在本次运行目录写 `report.md`，并返回简短中文发布清单：产品名和官网链接、Facebook 状态和永久链接、Google 表格回写状态与行号/链接、尝试及跳过的候选数与原因、素材目录和台账链接。明确区分 `dry-run`、`blocked`、`failed`、`uncertain`、`reporting_pending` 和 `complete`。没有已验证的公开链接时不得宣称发布成功；回写未验证时不得宣称整个流程完成。
 
 ## 脚本与依赖
 

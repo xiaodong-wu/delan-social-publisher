@@ -6,6 +6,7 @@
 - 发布主页：[dlflexdelancable](https://www.facebook.com/dlflexdelancable)
 - 仅发布 Facebook，不包含站内文章或 LinkedIn。
 - 支持 `dry-run`、候选筛选、同批次续跑、提交结果核对和防重复发布。
+- 发布成功后回写指定的 Google 发布记录表，以 Facebook 永久链接去重；站内和 LinkedIn 列均填“不适用”。
 
 ## 安装
 
@@ -47,9 +48,10 @@ python3 -m pip install Pillow
 - 一张四宫格社媒图片，正式素材为无 EXIF/XMP/ICC 元数据的 WebP，浏览器上传使用临时 JPEG。
 - 参数必须来自对应产品的官网证据，保留可选配置与测试条件；不能将认证徽标当作该型号已获认证的证明。
 - 发布前验证身份、文案、图片和文件哈希；提交结果不确定时先核对平台状态，禁止猜测性重复提交。
-- 本地 JSON 记录不代替实际平台验证；只有取得并核对公开帖子永久链接后才能报告完成。
+- 本地 JSON 记录不代替实际平台验证；取得并核对公开帖子永久链接、完成 Google 表格写入及回读后才能报告完成。
+- 表格访问需要已连接且有写权限的 Google Sheets 工具。回写流程、固定五列映射及补录方法见 [reporting.md](delan-social-publisher/references/reporting.md)。表格回写失败不会重发 Facebook。
 
-2026-10-15 已完成官网 4 页、48 个唯一产品链接的抓取检查及 17 项离线回归测试。此次打包尚未执行真实图片生成或 Facebook 发帖。
+2026-10-15 已完成官网 4 页、48 个唯一产品链接的抓取检查与真实 Facebook 发布验证。本次修复补回 Google 表格回写，增加漏记、重复、错表、错误链接和补录幂等性的离线检查。
 
 运行离线测试：
 

@@ -12,6 +12,7 @@ from scrape_product import CandidateError, discover, extract, normalize_url, pre
 from update_manifest import update
 from validate_campaign import inspect_campaign, validate_copy
 from validate_completion import complete
+from record_reporting import HEADERS, SPREADSHEET_ID, plan, record
 
 URL = 'https://en.delancable.com/product/36225'
 POST = 'https://www.facebook.com/dlflexdelancable/posts/test-post'
@@ -70,6 +71,22 @@ class WorkflowTests(unittest.TestCase):
         evidence = manifest.parent / 'evidence/facebook-publication.json'
         write_json(evidence, {'target_url':TARGET_URL,'post_url':POST,'verified_at':now(),'author_matches':True,'text_matches':True,'product_link_matches':True,'image_matches':True,'evidence_file':'evidence/test-observation.txt','notes':'Offline fixture only'})
         return evidence
+
+    def reporting(self, manifest, change=None):
+        values = plan(manifest)['values']
+        cells = lambda row: {'values': [{'userEnteredValue': {'stringValue': v}} for v in row]}
+        evidence = {'verified_at': now(), 'row_number': 2,
+                    'readback': {'spreadsheetId': SPREADSHEET_ID, 'properties': {'title': 'social-auto-upload'},
+                                 'sheets': [{'properties': {'sheetId': 0, 'title': '工作表1', 'gridProperties': {'rowCount': 1000}},
+                                             'data': [{'rowData': [cells(HEADERS), cells(values)]}]}]},
+                    'search': {'matched_row_count': 1, 'returned_matching_row_count': 1,
+                               'scanned_range': 'A1:E1000', 'truncated': False,
+                               'markdown': '| 2 | ' + ' | '.join(values) + ' |'}}
+        if change:
+            change(evidence)
+        path = manifest.parent / 'evidence/google-sheet-verification.json'
+        write_json(path, evidence)
+        return path
 
     def test_normalization(self):
         self.assertEqual(normalize_url('/product?page=2'), normalize_url('/product/page/2'))
@@ -163,10 +180,53 @@ class WorkflowTests(unittest.TestCase):
         manifest = self.campaign()
         update(manifest, 'pending', submission_started=True)
         update(manifest, 'published', url=POST, evidence=self.publication(manifest))
+        record(manifest, 'reported', self.reporting(manifest))
         self.assertEqual(complete(manifest)['status'], 'complete')
         (manifest.parent / 'social-upload.jpg').unlink()
         self.assertEqual(complete(manifest)['status'], 'complete')
         with self.assertRaises(ValueError): update(manifest, 'pending', submission_started=True)
+
+    def test_publication_without_reporting_cannot_complete(self):
+        manifest = self.campaign()
+        update(manifest, 'pending', submission_started=True)
+        update(manifest, 'published', url=POST, evidence=self.publication(manifest))
+        with self.assertRaisesRegex(ValueError, 'reporting is not verified'):
+            complete(manifest)
+        fb = read_json(manifest)['channels']['facebook']
+        record(manifest, 'blocked', error='Synthetic Sheets access failure')
+        self.assertEqual(read_json(manifest)['channels']['facebook'], fb)
+        with self.assertRaises(ValueError): update(manifest, 'pending', submission_started=True)
+
+    def test_reporting_rejects_wrong_destination_or_duplicates(self):
+        manifest = self.campaign()
+        update(manifest, 'pending', submission_started=True)
+        update(manifest, 'published', url=POST, evidence=self.publication(manifest))
+        for change in [lambda e: e['readback'].update(spreadsheetId='wrong'),
+                       lambda e: e['search'].update(matched_row_count=2),
+                       lambda e: e['search'].update(scanned_range='A1:E5'),
+                       lambda e: e['readback']['sheets'][0]['data'][0]['rowData'][1]['values'][3].update(userEnteredValue={'stringValue': 'https://example.com/wrong'})]:
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                record(manifest, 'reported', self.reporting(manifest, change))
+
+    def test_reporting_is_idempotent_and_tampering_blocks_completion(self):
+        manifest = self.campaign()
+        update(manifest, 'pending', submission_started=True)
+        update(manifest, 'published', url=POST, evidence=self.publication(manifest))
+        evidence = self.reporting(manifest)
+        first = record(manifest, 'reported', evidence)
+        self.assertEqual(first, record(manifest, 'reported', evidence))
+        self.assertEqual(len(read_json(manifest)['reporting_history']), 1)
+        self.assertEqual(complete(manifest)['google_sheet_row'], 2)
+        with self.assertRaises(ValueError): record(manifest, 'failed', error='Cannot downgrade')
+        tampered = read_json(evidence)
+        tampered['row_number'] = 3
+        write_json(evidence, tampered)
+        with self.assertRaises(ValueError): complete(manifest)
+
+    def test_dry_run_and_unpublished_runs_cannot_report(self):
+        for mode in ['dry-run', 'live']:
+            with self.subTest(mode=mode), self.assertRaises(ValueError):
+                record(self.campaign(mode), 'blocked', error='Not a live published result')
 
     def test_completion_detects_changed_canonical_file(self):
         manifest = self.campaign()

@@ -213,7 +213,8 @@ def prepare_run(root, product, raw, image_data, suffix, ledger, mode):
                 'product': {'title': product['title'], 'canonical_url': product['canonical_url']},
                 'artifacts': {'product': 'product.json', 'source_html': 'source/page.html', 'source_hero': hero,
                               'facebook_copy': 'facebook.txt', 'social_image': 'social.webp', 'social_transport': 'social-upload.jpg'},
-                'selection_log': str(ledger), 'channels': {'facebook': {'status': 'pending'}}, 'history': []}
+                'selection_log': str(ledger), 'channels': {'facebook': {'status': 'pending'}}, 'history': [],
+                'reporting': {'google_sheet': {'status': 'pending' if mode == 'live' else 'not_applicable'}}}
     write_json(run / 'manifest.json', manifest)
     return run / 'manifest.json'
 

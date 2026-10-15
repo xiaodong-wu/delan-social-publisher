@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify one Facebook publication with immutable submission evidence, never other channels."""
+"""Require verified Facebook publication and an exact, deduplicated Google Sheets audit row."""
 from __future__ import annotations
 import argparse
 import json
@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from common import checked_hashes, checked_publication, load_manifest, now, write_json
 from validate_campaign import inspect_campaign
+from record_reporting import checked_reporting
 
 
 def complete(path):
@@ -25,8 +26,14 @@ def complete(path):
         if frozen['hashes'].get(name) != digest:
             raise ValueError('Campaign differs from submitted artifacts')
     checked_publication(root, data, channel.get('url', ''), channel.get('evidence', ''))
+    reporting = data.get('reporting', {}).get('google_sheet', {})
+    if reporting.get('status') != 'reported':
+        raise ValueError('Facebook is published, but Google Sheets reporting is not verified')
+    if checked_reporting(path, reporting.get('evidence', '')) != reporting:
+        raise ValueError('Google Sheets reporting differs from its verified evidence')
     result = {'status': 'complete', 'verified_at': now(), 'facebook_url': channel['url'],
-              'product_url': data['product']['canonical_url'], 'manifest': str(path)}
+              'product_url': data['product']['canonical_url'], 'manifest': str(path),
+              'google_sheet_url': reporting['url'], 'google_sheet_row': reporting['row_number']}
     write_json(root / 'evidence/completion-validation.json', result)
     data['status'] = 'complete'
     data['completion'] = result

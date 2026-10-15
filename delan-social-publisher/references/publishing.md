@@ -42,6 +42,6 @@ URL 可为该用户名下 `/posts/...`、已核实同主页数字 ID 下 `/posts
 - 仅当当前证据明确证明第一次没有发布、没有等待审核或排期任务时，允许一次同批次重试。保存 `evidence/reconciliation.json`：`target_url`、`checked_at`、`confirmed_absent: true`、`no_pending_submission: true`、非空 `notes`、`evidence_file`；然后用 `--submission-started --reconciliation FILE` 记录第二次提交。不能仅因暂时看不到帖子就断言未发布；仍不确定则停止。
 - 不自动撤回成功帖子，不降级已发布状态；已发布批次重跑仅补核验/报告。用户明确要求恢复某批次时重新预检，但跳过已发布结果。
 - `dry-run` 永远不能记录提交或发布成功；需要正式发布时新建 live 批次，重新预检。
-- 完成守卫同时检查正式素材、提交时的验证哈希、永久提交历史、公开证据及目标主页。临时 JPEG 在 `complete` 后可删除，其他证据须保留。
+- 完成守卫同时检查正式素材、提交时的验证哈希、永久提交历史、公开证据、目标主页及 Google 表格回写证据。临时 JPEG 在 `complete` 后可删除，其他证据须保留。
 
-本地完成报告不依赖原技能的三渠道 Google Sheet。日后另行授权表格回写时，应以 Facebook 永久链接或 run ID 去重；回写失败不能导致重发。
+核实 Facebook 发布后必须按 [reporting.md](reporting.md) 回写指定 Google 表格，以 Facebook 永久链接去重，站内和 LinkedIn 两列填“不适用”。回写并回读成功前，不得报告整体完成；回写失败不能导致重发。
