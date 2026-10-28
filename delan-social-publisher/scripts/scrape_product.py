@@ -16,6 +16,7 @@ from urllib.request import Request, urlopen
 from uuid import uuid4
 from PIL import Image, UnidentifiedImageError
 from common import CATALOG_URL, SKILL, TARGET_URL, load_manifest, now, read_json, submitted, write_json
+from publication_history import build_history, check_history, product_key
 
 SITE = 'en.delancable.com'
 ASSET_HOSTS = {SITE, 'static.dcodingmax.com'}
@@ -198,7 +199,7 @@ def extract(raw, url):
             'review_required': True}
 
 
-def prepare_run(root, product, raw, image_data, suffix, ledger, mode):
+def prepare_run(root, product, raw, image_data, suffix, ledger, mode, history=None):
     pid = product['canonical_url'].rsplit('/', 1)[-1]
     run = root / (now()[:19].replace(':', '').replace('-', '') + '-' + pid + '-' + uuid4().hex[:6])
     (run / 'source').mkdir(parents=True)
@@ -208,22 +209,31 @@ def prepare_run(root, product, raw, image_data, suffix, ledger, mode):
     (run / hero).write_bytes(image_data)
     write_json(run / 'product.json', product)
     write_json(run / 'evidence/product-review.json', {'status': 'pending', 'usable_fact_ids': [], 'conflicts': product['conflicts'], 'notes': ''})
-    manifest = {'version': 1, 'skill': SKILL, 'run_id': run.name, 'mode': mode,
+    if history is not None:
+        write_json(run / 'evidence/selection-history.json', history)
+    manifest = {'version': 2, 'skill': SKILL, 'run_id': run.name, 'mode': mode,
                 'created_at': now(), 'status': 'prepared', 'target_url': TARGET_URL,
                 'product': {'title': product['title'], 'canonical_url': product['canonical_url']},
                 'artifacts': {'product': 'product.json', 'source_html': 'source/page.html', 'source_hero': hero,
                               'facebook_copy': 'facebook.txt', 'social_image': 'social.webp', 'social_transport': 'social-upload.jpg'},
                 'selection_log': str(ledger), 'channels': {'facebook': {'status': 'pending'}}, 'history': [],
                 'reporting': {'google_sheet': {'status': 'pending' if mode == 'live' else 'not_applicable'}}}
+    manifest['selection_history'] = 'evidence/selection-history.json'
     write_json(run / 'manifest.json', manifest)
     return run / 'manifest.json'
 
 
 def select(ledger_path, log):
+    # Run before touching any candidate. A stale/partial history is not an empty history.
+    history = log.get('publication_history')
+    excluded = check_history(history, log['output_root'], live=log['mode'] == 'live') if history else set()
+    if log['mode'] == 'live' and history is None:
+        raise ValueError('Live selection requires a fresh publication history snapshot')
+    log['skipped_history'] = [c for c in log['candidates'] if product_key(c['url']) in excluded]
     tried = {x['url'] for x in log['attempts']}
     for candidate in log['candidates']:
         url = candidate['url']
-        if url in tried or len(log['attempts']) >= log['max_candidates']:
+        if product_key(url) in excluded or url in tried or len(log['attempts']) >= log['max_candidates']:
             continue
         record = {'url': url, 'status': 'checking', 'checked_at': now()}
         log['attempts'].append(record)
@@ -245,7 +255,7 @@ def select(ledger_path, log):
                         raise CandidateError('Product hero must be recognizable raster content at least 200px per side')
             except (UnidentifiedImageError, OSError) as exc:
                 raise CandidateError('Product hero cannot be decoded') from exc
-            manifest = prepare_run(Path(log['output_root']), product, raw, image_data, suffix, ledger_path, log['mode'])
+            manifest = prepare_run(Path(log['output_root']), product, raw, image_data, suffix, ledger_path, log['mode'], history)
         except CandidateError as exc:
             record.update(status='rejected', reason=str(exc))
             write_json(ledger_path, log)
@@ -260,8 +270,8 @@ def select(ledger_path, log):
         write_json(ledger_path, log)
         return {'manifest': str(manifest), 'run_dir': str(manifest.parent), 'product': product['title'],
                 'product_url': url, 'selection_log': str(ledger_path), 'candidates_tried': len(log['attempts']),
-                'catalog_count': len(log['candidates'])}
-    log.update(status='blocked', reason='Candidate pool exhausted or ten-candidate limit reached')
+                'catalog_count': len(log['candidates']), 'history_excluded': len(log['skipped_history'])}
+    log.update(status='blocked', reason='No eligible unpublished product remains, or ten-candidate limit reached; do not automatically recycle published products')
     write_json(ledger_path, log)
     raise CandidateError(f'No qualified product; see {ledger_path}')
 
@@ -294,11 +304,14 @@ def main():
     p.add_argument('--mode', choices=['live', 'dry-run'])
     p.add_argument('--retry-from', type=Path)
     p.add_argument('--reason')
+    p.add_argument('--history', type=Path, help='Fresh publication_history.py snapshot; required for live runs')
     args = p.parse_args()
     if args.retry_from:
         if args.product_url or args.output_root or args.mode or not args.reason or not args.reason.strip():
             p.error('--retry-from requires --reason and no other selection overrides')
         ledger, log = retry(args.retry_from, args.reason)
+        if args.history:
+            log['publication_history'] = read_json(args.history)
     else:
         if args.reason:
             p.error('--reason requires --retry-from')
@@ -314,6 +327,8 @@ def main():
                'attempts': [], 'candidates': [], 'created_at': now()}
         write_json(ledger, log)
         try:
+            log['publication_history'] = read_json(args.history) if args.history else build_history(root)
+            check_history(log['publication_history'], root, live=log['mode'] == 'live')
             if args.product_url:
                 url = normalize_url(args.product_url)
                 if not re.fullmatch(r'/product/\d+', urlparse(url).path):

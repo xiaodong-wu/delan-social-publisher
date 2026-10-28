@@ -5,7 +5,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from common import checked_hashes, checked_publication, load_manifest, now, write_json
+from common import checked_hashes, checked_publication, load_manifest, local_file, now, sha256, write_json
 from validate_campaign import inspect_campaign
 from record_reporting import checked_reporting
 
@@ -20,6 +20,10 @@ def complete(path):
     if not 1 <= len(attempts) <= 2 or len(attempts) != data.get('submission_count'):
         raise ValueError('Missing or inconsistent submission history')
     frozen = attempts[0]['validation']
+    if data.get('version', 1) >= 2:
+        guard = attempts[-1].get('duplicate_guard', {})
+        if guard.get('history_sha256') != sha256(local_file(root, 'evidence/history-preflight.json')):
+            raise ValueError('Submission history preflight is missing or changed')
     checked_hashes(root, frozen, allow_missing_transport=True)
     current = inspect_campaign(path, allow_missing_transport=True)
     for name, digest in current['hashes'].items():

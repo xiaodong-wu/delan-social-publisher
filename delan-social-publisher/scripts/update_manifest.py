@@ -10,6 +10,7 @@ from pathlib import Path
 from common import (check_target_evidence, checked_hashes, checked_publication, load_manifest,
                     local_file, now, read_json, recent, submitted, timestamp, write_json)
 from validate_campaign import inspect_campaign
+from publication_history import guard_submission
 
 STATUSES = {'pending', 'published', 'blocked', 'failed', 'uncertain'}
 
@@ -18,7 +19,9 @@ def update(path, status, url=None, error=None, submission_started=False, evidenc
     path = Path(path).resolve()
     if status not in STATUSES:
         raise ValueError('Unsupported Facebook status')
-    with path.with_suffix('.lock').open('a') as lock:
+    # Serialize all runs sharing this history root, not merely updates to one manifest.
+    with (path.parent.parent / '.publication.lock').open('a') as root_lock, path.with_suffix('.lock').open('a') as lock:
+        fcntl.flock(root_lock, fcntl.LOCK_EX)
         fcntl.flock(lock, fcntl.LOCK_EX)
         data = load_manifest(path)
         root = path.parent
@@ -47,6 +50,8 @@ def update(path, status, url=None, error=None, submission_started=False, evidenc
                 raise ValueError('At most one reconciled retry is allowed')
             if submitted(data) and not prior:
                 raise ValueError('Submission history is inconsistent; do not retry')
+            if not prior or data.get('version', 1) >= 2:
+                event['duplicate_guard'] = guard_submission(path, data, preflight)
             if prior:
                 if not reconciliation:
                     raise ValueError('Reconcile the first submission before a single bounded retry')

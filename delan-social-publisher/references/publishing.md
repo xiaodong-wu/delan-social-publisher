@@ -18,12 +18,20 @@ Live 生成前及最终提交前都检查指定主页的 URL、可见 DLFLEX / D
 
 截图路径相对运行目录。连接器路线可保存等价的响应证据文件。提交时预检记录须在过去 30 分钟以内。此记录不应包含凭据或完整会话数据。
 
+## AI 标签与上传文件
+
+可选“AI 标签”默认关闭；如编辑器继承此前开启状态，应关闭并核对，不因使用 imagegen 主动开启。预检 JSON 增加 `ai_label: {"value":"off","reason":"实际观察和关闭理由"}`。没有该选项时记录 `value: "unavailable"` 与实际情况。
+
+平台明确强制披露或用户明确要求开启时，记录 `value: "on"`、`basis: "platform_required"` 或 `"user_requested"`、`reason` 和 `evidence`（实际平台截图路径或用户原话）。不隐藏强制披露、不承诺平台不会自动打标；无法判断是否强制时停止说明。
+
+只上传本次优化和校验后的 `social-upload.jpg`；正式 WebP 同时归档。元数据清理独立于可选标签设置，必须校验实际上传文件。
+
 ## 提交
 
 1. 读取并通过 `validate_campaign.py`；确认文件未被改动。
 2. 在目标主页打开创建帖子，粘贴 `facebook.txt` 全文并上传 `social-upload.jpg`。WebP 是归档素材，JPEG 是浏览器传输衍生件。
 3. 检查预览的身份、完整文案、图片四宫格、无残留其他草稿。
-4. 运行 `update_manifest.py MANIFEST --status pending --submission-started`。只有标记成功才点击最终发布一次。
+4. 按 [history.md](history.md) 刷新历史预检，再运行 `update_manifest.py MANIFEST --status pending --submission-started`。脚本在共享根目录锁下重查同产品占用，只有标记成功才点击最终发布一次。
 5. 等待平台结果，打开目标主页时间线或 Meta 已发布内容列表，检查作者、产品链接、全文、图片和时间。取得并打开公开帖子永久链接；仅有 toast、编辑器关闭、草稿或排期成功都不算已发布。
 6. 写 `evidence/facebook-publication.json` 后记录 `published`，运行 `validate_completion.py`。不要在此流程发布站内内容或其他社交渠道。
 

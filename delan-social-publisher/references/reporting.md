@@ -2,6 +2,8 @@
 
 每次已授权的 live 运行，在 Facebook 帖子发布并核实永久链接后，立即写入一条发布记录。回写属于本技能流程，无需额外确认。写入并回读验证后才可报告 `complete`。`dry-run` 不写表；Facebook 尚未确认成功时不创建记录。
 
+选品前还会只读本表，按 [history.md](history.md) 关联本地产品记录；不增加列、不改变五列映射。选品历史去重和本节的回写链接去重分别执行。
+
 ## 固定目标和五列
 
 - 表格：[social-auto-upload](https://docs.google.com/spreadsheets/d/18iLpJ7bpDbJzxYtg0vsSOQxOR2e0KBuMI9C7LK0MhAw/edit?gid=0)

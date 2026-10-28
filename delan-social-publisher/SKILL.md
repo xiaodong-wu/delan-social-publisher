@@ -23,18 +23,21 @@ Live 运行在生成图片前打开指定主页，核实主页 URL、可见品�
 
 确认输出目录和图像生成工具可用。Live 运行同时读取 [references/reporting.md](references/reporting.md)，检查表格访问与五列表头。`dry-run` 不要求 Facebook 登录，不打开发布编辑器，不执行提交或表格写入；其余取证、文案和图片检查相同。图像生成前加载已安装的 `imagegen` 技能。
 
-### 2. 选择和核实产品
+### 2. 检查历史，再选择和核实产品
 
-阅读 [references/product-selection.md](references/product-selection.md)，运行：
+阅读 [references/product-selection.md](references/product-selection.md)。每次先按 [references/history.md](references/history.md) 合并本地批次和实时 Google 表格，生成历史快照；无法关联产品的旧帖先打开核对。排除已发布及任何已提交但结果未定的产品，在剩余产品中随机抽取。全部已发布时停止，不自动循环复发。
+
+历史快照通过后运行：
 
 ```bash
-python3 scripts/scrape_product.py --output-root /absolute/path/to/campaign-runs
+python3 scripts/scrape_product.py --output-root /absolute/path/to/campaign-runs \
+  --history /absolute/path/to/history.json
 # 指定产品或仅预览时按需追加：
 # --product-url https://en.delancable.com/product/PRODUCT_ID
 # --mode dry-run
 ```
 
-脚本遍历所有目录分页，按 URL 去重后随机抽取，最多尝试 10 个不同产品。指定产品默认不可替换。所有文件保存在技能目录之外。
+脚本遍历所有目录分页，按规范产品 URL 去重并排除历史后随机抽取，最多审查 10 个未发布候选。历史排除不占事实审查预算。指定产品也检查历史且不可替换。所有运行文件保存在技能目录之外；同一账号持续使用相同输出根目录。`dry-run` 可只检查本地历史，但要说明覆盖范围，不能据此声称线上未发布。
 
 使用返回的 `manifest.json`、`product.json`、`source/page.html` 和 `source/hero.*`。读取原始产品正文，并用 `view_image` 查看主图；不要只信脚本筛选结果。确认标题、正文、线芯结构、护套和可选配置无冲突。填写脚本创建的 `evidence/product-review.json`：将 `status` 设为 `approved`，填写 `reviewed_at`、`notes` 和 `usable_fact_ids`，保留空的 `conflicts` 列表；不得把有冲突的候选改成通过。
 
@@ -50,9 +53,9 @@ python3 scripts/scrape_product.py --retry-from MANIFEST --reason '具体的产�
 
 阅读 [references/content-spec.md](references/content-spec.md)。
 
-1. 根据已批准的产品证据写 `facebook.txt`：80–150 个英文词，四行 emoji 功能介绍、短收益段落、B2B 询盘 CTA、独占一行的完整产品链接、8–12 个相关标签。
+1. 保留原本格式写 `facebook.txt`：80–150 个英文词，四行 emoji 功能介绍、短收益段落、B2B 询盘 CTA、独占一行的完整产品链接、8–12 个相关标签。先读历史快照中最近最多五篇正文，在原格式内围绕本产品选型问题调整事实顺序、措辞、收益解释和 CTA，不只替换型号或同义词。
 2. 使用产品类型、结构、用途中的已核实词语自然表达，不套用轮胎汽配词汇；无需生成站内 SEO 文章或文章关键词密度计划。
-3. 填写 `evidence/copy-review.json`，将每个产品事实声明关联到 `product.json` 的事实 ID 或标题，并检查所有数字、条件与可选项。示例见内容规范。
+3. 填写 `evidence/copy-review.json`，将每个事实声明关联到事实 ID 或标题，检查数字和可选条件，并记录 `angle`、`recent_posts_reviewed` 和 `distinct_from_recent`。示例见内容规范。
 4. 以查看过的主图为身份参考，用 `imagegen` 生成一张 1:1 四宫格社媒图；不生成封面或文章配图。保持线芯数量、配色、屏蔽、护套、端部结构和可见型号一致。不得凭空生成接头、认证标志或应用场景。
 5. 检查生成图并填写 `evidence/image-review.json`。每张图最多初次生成 + 两次定向修正 + 一次保留原产品的背景/布局回退；重大结构错误仍存在就停止。
 6. 把生成结果复制进本次运行目录，再执行优化。此脚本只负责必要的格式转换、裁剪、压缩和元数据移除；所有视觉内容生成与修正仍使用 `imagegen`。
@@ -62,7 +65,7 @@ python3 scripts/optimize_image.py GENERATED_IMAGE RUN_DIR/social.webp --kind soc
   --transport-jpeg RUN_DIR/social-upload.jpg
 ```
 
-保留 `social.webp` 为正式素材；浏览器仅上传临时的 `social-upload.jpg`。两者均为正方形，最小 960×960、最大 1600×1600，不超过 750 KiB，无 EXIF/XMP/ICC 元数据。人工检查压缩成品未裁掉线缆端部或四宫格内容。
+保留 `social.webp` 为正式素材；浏览器仅上传临时的 `social-upload.jpg`。两者均为正方形，最小 960×960、最大 1600×1600，不超过 750 KiB。像素重建清理 EXIF、XMP、ICC、注释及附加元数据，并检查两种最终容器；生成原图只归档，不直接上传。人工检查压缩成品未裁掉线缆端部或四宫格内容。
 
 ### 4. 验证、提交与结果核对
 
@@ -72,7 +75,9 @@ python3 scripts/validate_campaign.py MANIFEST
 
 必须先通过整批验证；脚本会将各文件哈希写入 `evidence/campaign-validation.json`。验证通过不代表人工事实或视觉判断自动成立。`dry-run` 到此返回“预演通过，未发布”。
 
-Live 运行按 [references/publishing.md](references/publishing.md) 核实编辑器身份、精确文案和上传预览，保存 `evidence/preflight.json`。最终点击发布前记录永久提交标记：
+Live 运行按 [references/publishing.md](references/publishing.md) 核实编辑器身份、精确文案和上传预览，保存 `evidence/preflight.json`。**可选 AI 标签默认关闭，不因使用 imagegen 自动开启**；平台明确要求或用户明确要求时记录依据，不承诺平台不会自动标记。
+
+最终点击发布前按历史规范刷新表格与本地记录，写 `evidence/history-preflight.json`。提交脚本在共享输出根目录加锁，再查同产品占用和重复文案，然后记录永久提交标记：
 
 ```bash
 python3 scripts/update_manifest.py MANIFEST --status pending --submission-started
@@ -104,6 +109,8 @@ python3 scripts/validate_completion.py MANIFEST
 在本次运行目录写 `report.md`，并返回简短中文发布清单：产品名和官网链接、Facebook 状态和永久链接、Google 表格回写状态与行号/链接、尝试及跳过的候选数与原因、素材目录和台账链接。明确区分 `dry-run`、`blocked`、`failed`、`uncertain`、`reporting_pending` 和 `complete`。没有已验证的公开链接时不得宣称发布成功；回写未验证时不得宣称整个流程完成。
 
 ## 脚本与依赖
+
+报告另列历史排除数量、文案切入点、实际 AI 标签状态及正式 WebP/上传 JPEG 的元数据检查结果。修改技能本身不触发发帖，不修改既有帖子。
 
 脚本路径均相对本技能目录。Python 3.9+；图片处理需要 Pillow，其余仅用标准库。所有脚本只读官网或处理本地文件；实际发布由受支持连接器或浏览器完成。
 

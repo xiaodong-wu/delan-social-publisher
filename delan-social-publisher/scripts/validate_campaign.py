@@ -6,17 +6,19 @@ import json
 import re
 import sys
 from pathlib import Path
-from PIL import Image
 from common import load_manifest, local_file, now, read_json, sha256, submitted, timestamp, write_json
-from optimize_image import validate
+from optimize_image import validate, validate_transport
+from publication_history import check_history, check_copy_novelty
 
 WORD = re.compile(r"[A-Za-z]+(?:[-'][A-Za-z]+)*")
 TAG = re.compile(r'#[A-Za-z][A-Za-z0-9_]*')
 EMOJI = ('🏭', '📦', '🛠', '⚙', '🔧', '✅', '💡', '📏', '🔌', '⚡', '🧵', '🛡', '🔗', '🔬', '🤖', '🔄')
 
 
-def validate_copy(text, url):
+def validate_copy(text, url, version=2):
     lines = [line.strip() for line in text.strip().splitlines() if line.strip()]
+    if len(lines) < 3:
+        raise ValueError('Include a substantive body, a product URL and hashtags')
     if len(lines) < 8 or not all(line.startswith(EMOJI) for line in lines[:4]):
         raise ValueError('Start with exactly four emoji feature lines, then benefit, CTA, URL, hashtags')
     if any(line.startswith(EMOJI) for line in lines[4:]):
@@ -24,14 +26,16 @@ def validate_copy(text, url):
     if lines[-2] != url or re.findall(r'https?://\S+', text) != [url]:
         raise ValueError('The sole URL must be the selected product link on the penultimate nonempty line')
     tags = TAG.findall(lines[-1])
-    if not 8 <= len(tags) <= 12 or len(set(t.casefold() for t in tags)) != len(tags) or TAG.sub('', lines[-1]).strip():
-        raise ValueError('Last line must contain 8–12 unique English hashtags')
+    min_tags, max_tags = 8, 12
+    if not min_tags <= len(tags) <= max_tags or len(set(t.casefold() for t in tags)) != len(tags) or TAG.sub('', lines[-1]).strip():
+        raise ValueError(f'Last line must contain {min_tags}–{max_tags} unique English hashtags')
     if TAG.search('\n'.join(lines[:-1])):
         raise ValueError('Keep all hashtags on the final line')
     words = len(WORD.findall('\n'.join(lines[:-2])))
-    if not 80 <= words <= 150 or re.search(r'[\u3400-\u9fff]', text):
-        raise ValueError(f'Copy must have 80–150 English body words, excluding URL/hashtags; found {words}')
-    return {'body_words': words, 'feature_lines': 4, 'hashtags': len(tags)}
+    lo, hi = 80, 150
+    if not lo <= words <= hi or re.search(r'[\u3400-\u9fff]', text):
+        raise ValueError(f'Copy must have {lo}–{hi} English body words, excluding URL/hashtags; found {words}')
+    return {'body_words': words, 'feature_lines': sum(line.startswith(EMOJI) for line in lines[:-2]), 'hashtags': len(tags)}
 
 
 def review(root, name):
@@ -55,7 +59,8 @@ def inspect_campaign(path, allow_missing_transport=False):
     if product.get('conflicts'):
         raise ValueError('Unresolved source conflicts')
     text = paths['facebook_copy'].read_text(encoding='utf-8')
-    metrics = validate_copy(text, product['canonical_url'])
+    version = data.get('version', 1)
+    metrics = validate_copy(text, product['canonical_url'], version)
     source_review = review(root, 'product')
     allowed = source_review.get('usable_fact_ids', [])
     ids = {f['id'] for f in product['facts']}
@@ -72,6 +77,17 @@ def inspect_campaign(path, allow_missing_transport=False):
     first_lines = [x.strip() for x in text.splitlines() if x.strip()][:4]
     if any(not any(c['text'] in line for c in claims) for line in first_lines):
         raise ValueError('Every feature line must have a traced claim')
+    if version >= 2:
+        history = read_json(local_file(root, data.get('selection_history')))
+        excluded = check_history(history, root.parent, live=data['mode'] == 'live', fresh=False)
+        if product['canonical_url'] in excluded:
+            raise ValueError('Selected product was already published or reserved')
+        if not copy_review.get('angle') or not copy_review.get('distinct_from_recent'):
+            raise ValueError('Explain this product-specific angle and how it differs from recent posts')
+        expected_posts = sorted({r['post_url'] for r in history.get('recent_posts', []) if r.get('post_url')})
+        if sorted(set(copy_review.get('recent_posts_reviewed', []))) != expected_posts:
+            raise ValueError('Review the recent published copies listed in selection history')
+        metrics['novelty'] = check_copy_novelty(text, history['records'])
     image_review = review(root, 'image')
     if (image_review.get('panels') != 4 or image_review.get('material_issues') != [] or
             not 1 <= image_review.get('attempt_count', 0) <= 4 or not image_review.get('versions')):
@@ -85,15 +101,11 @@ def inspect_campaign(path, allow_missing_transport=False):
         raise ValueError('Social image must be exactly square')
     if 'social_transport' in paths:
         transport = paths['social_transport']
-        with Image.open(transport) as im:
-            im.verify()
-        with Image.open(transport) as im:
-            if im.format != 'JPEG' or im.size != (image_metrics['width'], image_metrics['height']) or im.getexif() or any(k in im.info for k in ['exif', 'xmp', 'icc_profile', 'comment']):
-                raise ValueError('Transport must be metadata-free JPEG with canonical image dimensions')
-        if transport.stat().st_size > 750 * 1024:
-            raise ValueError('Transport exceeds 750 KiB')
+        validate_transport(transport, (image_metrics['width'], image_metrics['height']))
     files = list(paths.values()) + [local_file(root, f'evidence/{name}-review.json') for name in ['product', 'copy', 'image']]
     files += [local_file(root, version.get('path')) for version in image_review['versions']]
+    if data.get('version', 1) >= 2:
+        files.append(local_file(root, data['selection_history']))
     hashes = {str(p.relative_to(root)): sha256(p) for p in files}
     return {'status': 'passed', 'validated_at': now(), 'mode': data['mode'], 'product_url': product['canonical_url'],
             'copy': metrics, 'image': image_metrics, 'hashes': hashes}

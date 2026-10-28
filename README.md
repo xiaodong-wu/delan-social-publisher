@@ -6,6 +6,9 @@
 - 发布主页：[dlflexdelancable](https://www.facebook.com/dlflexdelancable)
 - 仅发布 Facebook，不包含站内文章或 LinkedIn。
 - 支持 `dry-run`、候选筛选、同批次续跑、提交结果核对和防重复发布。
+- 每次选品先合并本地发布历史与实时 Google 表格，优先从未发布产品中随机选择；已提交但结果未定的产品也排除。没有新产品时停止，不自动循环复发。
+- 保留原文案格式，在固定结构内根据最近五篇内容改变切入点、措辞、收益解释和 CTA。
+- 可选 AI 标签默认关闭；平台强制要求或用户明确要求时按实际依据处理。
 - 发布成功后回写指定的 Google 发布记录表，以 Facebook 永久链接去重；站内和 LinkedIn 列均填“不适用”。
 
 ## 安装
@@ -29,7 +32,7 @@ python3 -m pip install Pillow
 在 Codex 中调用：
 
 ```text
-使用 $delan-social-publisher 随机选择一个德缆官网产品，预检通过后直接发布到指定 Facebook 主页，并返回发布清单。
+使用 $delan-social-publisher 先检查历史记录，再随机选择一个未发布的德缆官网产品。保留原文案格式，减少重复套话；可选 AI 标签默认关闭。预检通过后直接发布、回写表格并返回发布清单。
 ```
 
 仅准备素材、验证而不发布：
@@ -45,13 +48,14 @@ python3 -m pip install Pillow
 ## 内容与验证
 
 - 英文正文 80–150 词，四行功能介绍、产品价值、询盘 CTA、产品链接和 8–12 个标签。
-- 一张四宫格社媒图片，正式素材为无 EXIF/XMP/ICC 元数据的 WebP，浏览器上传使用临时 JPEG。
+- 一张四宫格社媒图片；正式 WebP 和临时上传 JPEG 都从像素重建，检查 EXIF/XMP/ICC、注释及容器附加数据，生成原图只归档。
 - 参数必须来自对应产品的官网证据，保留可选配置与测试条件；不能将认证徽标当作该型号已获认证的证明。
 - 发布前验证身份、文案、图片和文件哈希；提交结果不确定时先核对平台状态，禁止猜测性重复提交。
 - 本地 JSON 记录不代替实际平台验证；取得并核对公开帖子永久链接、完成 Google 表格写入及回读后才能报告完成。
 - 表格访问需要已连接且有写权限的 Google Sheets 工具。回写流程、固定五列映射及补录方法见 [reporting.md](delan-social-publisher/references/reporting.md)。表格回写失败不会重发 Facebook。
+- 历史检查和旧帖产品链接映射见 [history.md](delan-social-publisher/references/history.md)。复用同一输出根目录；提交前刷新历史并在共享目录锁下检查其他批次。锁不覆盖其他设备或人工发帖，不能保证全平台并发互斥。
 
-2026-10-15 已完成官网 4 页、48 个唯一产品链接的抓取检查与真实 Facebook 发布验证。本次修复补回 Google 表格回写，增加漏记、重复、错表、错误链接和补录幂等性的离线检查。
+2026-10-28 更新历史去重、文案差异审核、AI 标签偏好与元数据检查。保留既有批次的补录和完成核验能力；修改技能不会自动发帖或改变已发布内容。
 
 运行离线测试：
 
@@ -65,5 +69,7 @@ python3 -m unittest discover -s delan-social-publisher/scripts -p 'test_*.py' -v
 python3 delan-social-publisher/scripts/scrape_product.py \
   --mode dry-run --output-root ./campaign-runs
 ```
+
+`dry-run` 未提供历史文件时只检查本地记录，不能宣称已覆盖线上历史。正式运行先通过连接器保存实时表格读取，使用 `publication_history.py` 生成快照，再传给 `scrape_product.py --mode live --history /absolute/path/to/history.json`。提交前生成新的 `evidence/history-preflight.json`；具体格式和命令见历史规范。
 
 运行数据保存在技能目录之外，不纳入此仓库。

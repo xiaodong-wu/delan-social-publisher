@@ -28,6 +28,15 @@
 
 不使用其他品牌、汽配模板、缩短网址、虚假稀缺性和夸张排名。展示本次产品的名称或明确类型。
 
+### 在原格式内减少模板感
+
+固定格式、词数和标签数量保持不变；变化的是事实选择、顺序和措辞。先读 `evidence/selection-history.json` 的 `recent_posts`（最近最多五篇）。选择有依据的采购关注点，例如导体组合、屏蔽层构成、外径与安装空间、可选材料的区别。应用场景只有官网明确支持时才使用。
+
+- 四行分别写清本产品不同事实，不反复用 “is specified / is listed / provides the construction described” 填充。
+- 收益段说明这些参数为何值得比较，不能反复写 “these published specifications provide a practical starting point”。只给材料时可提示选型需核对什么，不能推导未经验证的性能优势。
+- CTA 询问与切入点有关的 1–2 个需求，如导体组合、安装空间；不要每次复制 “Send your specifications and operating conditions”。不编造报价、交期或定制承诺。
+- 不靠换同义词、型号、emoji 掩盖复用；审核记录具体差异。脚本忽略 URL 和标签后比较正文，相似度 ≥0.82 阻止提交；不能用无意义填充规避。
+
 完成草稿后写 `evidence/copy-review.json`：
 
 ```json
@@ -35,6 +44,8 @@
 ```
 
 每条 `text` 必须逐字出现在 `facebook.txt`；事实 ID 必须获准使用。列出所有实质性声明，至少覆盖四行功能。校验器只能验证引用有效，不能代替对含义的审阅。
+
+新批次在审核 JSON 另加 `angle`（具体选型切入点）、`recent_posts_reviewed`（历史快照 recent_posts 的实际永久链接数组）、`distinct_from_recent`（事实组织、收益段和 CTA 的差异说明）。没有历史时数组为 `[]`，说明首次运行，不编造对照。上述 claims 示例只示意字段，实际至少四条并覆盖四行。
 
 ## 四宫格图
 
@@ -51,3 +62,5 @@
 ```
 
 路径均相对运行目录；`source` 必须对应 manifest 的源图，`final` 必须是正式 WebP。检查原图和压缩结果。不能把脚本裁剪/压缩当作图像生成；不足 960×960 的生成图须重新生成，不得靠放大通过。
+
+优化脚本从像素重建正式 WebP 和上传 JPEG，检查只保留必要图像数据（JPEG 的 JFIF 格式头可保留）。EXIF、XMP、ICC、注释和附加数据段不得进入发布素材。生成原图只归档、不直接上传；元数据清理与平台标签设置分开处理，不保证平台不会自动标记。

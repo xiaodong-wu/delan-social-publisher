@@ -1,4 +1,4 @@
 interface:
   display_name: "德缆 Facebook 自动发布"
-  short_description: "德缆官网选品，生成文案与四宫格图片，发布 Facebook 并回写 Google 表格"
-  default_prompt: "使用 $delan-social-publisher 随机选择一个德缆官网产品，完成预检后直接发布 Facebook、回写指定 Google 表格并返回发布清单。"
+  short_description: "先查历史优先选未发布德缆产品，保留文案格式，发布 Facebook 并回写表格"
+  default_prompt: "使用 $delan-social-publisher 先检查历史再随机选未发布产品，保留原文案格式并减少套话，可选 AI 标签默认关闭，清理图片元数据；预检后发布 Facebook、回写表格并返回清单。"

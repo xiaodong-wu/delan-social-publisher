@@ -16,7 +16,7 @@ from PIL import Image, ImageOps
 TARGETS = {
     "social": {"ratio": 1.0, "max_size": (1600, 1600), "min_size": (960, 960), "max_bytes": 750 * 1024},
 }
-METADATA_CHUNKS = {b"EXIF", b"XMP ", b"ICCP"}
+PIXEL_CHUNKS = {b'VP8 ', b'VP8L', b'VP8X', b'ALPH'}
 TRANSPORT_MAX_BYTES = 750 * 1024
 
 
@@ -83,13 +83,8 @@ def create_transport_jpeg(image: Image.Image, path: Path) -> dict[str, object]:
         if len(encoded) <= TRANSPORT_MAX_BYTES:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(encoded)
-            with Image.open(path) as check:
-                check.verify()
-            with Image.open(path) as check:
-                if check.format != "JPEG" or check.getexif() or any(key in check.info for key in ("exif", "icc_profile", "xmp")):
-                    raise RuntimeError("Transport derivative must be metadata-free JPEG")
-                width, height = check.size
-            return {"path": str(path), "format": "JPEG", "quality": quality, "bytes": len(encoded), "width": width, "height": height, "metadata_removed": True}
+            result = validate_transport(path, image.size)
+            return dict(result, quality=quality)
     raise RuntimeError("Unable to create the temporary social-upload JPEG below 750 KiB")
 
 
@@ -111,16 +106,73 @@ def compress(image: Image.Image, max_bytes: int, min_size: tuple[int, int]) -> t
 
 def metadata_chunks(data: bytes) -> list[str]:
     if len(data) < 12 or data[:4] != b"RIFF" or data[8:12] != b"WEBP":
-        return []
+        raise RuntimeError('Invalid WebP container')
+    if int.from_bytes(data[4:8], 'little') + 8 != len(data):
+        raise RuntimeError('Invalid WebP container length or trailing data')
     chunks: list[str] = []
     offset = 12
     while offset + 8 <= len(data):
         name = data[offset : offset + 4]
         size = int.from_bytes(data[offset + 4 : offset + 8], "little")
-        if name in METADATA_CHUNKS:
-            chunks.append(name.decode("ascii").strip())
+        if offset + 8 + size + size % 2 > len(data):
+            raise RuntimeError('Truncated WebP chunk')
+        if name not in PIXEL_CHUNKS:
+            chunks.append(name.decode("ascii", errors='replace').strip())
         offset += 8 + size + (size % 2)
+    if offset != len(data):
+        raise RuntimeError('Trailing WebP container bytes')
     return chunks
+
+
+def jpeg_metadata(data):
+    """Check all segments, including segments between progressive scans; keep only JFIF APP0."""
+    if not data.startswith(b'\xff\xd8'):
+        raise RuntimeError('Invalid JPEG container')
+    found, pos = [], 2
+    while pos < len(data):
+        if data[pos] != 255:  # Entropy-coded scan byte.
+            pos += 1
+            continue
+        while pos < len(data) and data[pos] == 255:
+            pos += 1
+        if pos == len(data):
+            break
+        marker = data[pos]
+        pos += 1
+        if marker == 0 or 208 <= marker <= 215:
+            continue
+        if marker == 217:
+            if pos != len(data):
+                found.append('trailing-data')
+            return found
+        if pos + 2 > len(data):
+            break
+        length = int.from_bytes(data[pos:pos+2], 'big')
+        if length < 2 or pos + length > len(data):
+            raise RuntimeError('Truncated JPEG segment')
+        if 225 <= marker <= 239 or marker == 254 or (marker == 224 and (length != 16 or data[pos+2:pos+7] != b'JFIF\0')):
+            found.append(f'APP{marker-224}' if 224 <= marker <= 239 else 'COMMENT')
+        pos += length
+    raise RuntimeError('JPEG missing end marker')
+
+
+def validate_transport(path, dimensions=None):
+    path = Path(path)
+    if path.stat().st_size > TRANSPORT_MAX_BYTES:
+        raise RuntimeError('Transport exceeds 750 KiB')
+    with Image.open(path) as im:
+        im.verify()
+    with Image.open(path) as im:
+        if im.format != 'JPEG' or (dimensions and im.size != dimensions):
+            raise RuntimeError('Transport must be JPEG with canonical image dimensions')
+        if im.getexif() or any(k in im.info for k in ('exif', 'xmp', 'icc_profile', 'comment')):
+            raise RuntimeError('Transport contains metadata')
+        width, height = im.size
+    markers = jpeg_metadata(path.read_bytes())
+    if markers:
+        raise RuntimeError('Transport contains non-pixel metadata: ' + ', '.join(markers))
+    return {'path': str(path), 'format': 'JPEG', 'width': width, 'height': height,
+            'bytes': path.stat().st_size, 'metadata_removed': True, 'metadata_segments': markers}
 
 
 def validate(path: Path, kind: str, max_bytes: int) -> dict[str, object]:
@@ -176,6 +228,11 @@ def main() -> int:
         raise ValueError("--max-bytes must be positive")
     if not args.input.is_file():
         raise FileNotFoundError(args.input)
+    paths = [args.input.resolve(), args.output.resolve()]
+    if args.transport_jpeg:
+        paths.append(args.transport_jpeg.resolve())
+    if len(paths) != len(set(paths)):
+        raise ValueError('Source, canonical image and upload derivative must use distinct paths')
     args.output.parent.mkdir(parents=True, exist_ok=True)
     if args.transport_jpeg and args.kind != "social":
         raise ValueError("--transport-jpeg is valid only with --kind social")
