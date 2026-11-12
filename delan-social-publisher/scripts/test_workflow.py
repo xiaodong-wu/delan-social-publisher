@@ -34,6 +34,7 @@ Contact Delan Cable with your application requirements and request confirmation 
 
 ''' + URL + '''
 #DLFLEX #DelanCable #SignalCable #CableSourcing #Copper #Insulation #Shielding #CableSelection'''
+LINK_FREE_COPY = COPY.replace(URL + '\n', '')
 
 
 class WorkflowTests(unittest.TestCase):
@@ -44,16 +45,19 @@ class WorkflowTests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def campaign(self, mode='live'):
+    def campaign(self, mode='live', version=1):
         product = extract(RAW, URL)
         image = Image.new('RGB', (1024, 1024), '#334455')
         buf = io.BytesIO()
         image.save(buf, format='PNG')
         ledger = self.root / 'selection/ledger.json'
         manifest = prepare_run(self.root, product, RAW, buf.getvalue(), 'png', ledger, mode)
-        m = read_json(manifest); m['version'] = 1; write_json(manifest, m)
+        m = read_json(manifest)
+        self.assertEqual(m['version'], 3)
+        m['version'] = version
+        write_json(manifest, m)
         root = manifest.parent
-        (root / 'facebook.txt').write_text(COPY)
+        (root / 'facebook.txt').write_text(LINK_FREE_COPY if version >= 3 else COPY)
         (root / 'generated-social.png').write_bytes(buf.getvalue())
         (root / 'social.webp').write_bytes(encode_webp(strip_metadata(image), 88))
         create_transport_jpeg(strip_metadata(image), root / 'social-upload.jpg')
@@ -67,6 +71,12 @@ class WorkflowTests(unittest.TestCase):
         snapshot = build_history(self.root)
         snapshot.update(coverage='local_and_sheet', sheet_checked_at=now())
         write_json(root / 'evidence/history-preflight.json', snapshot)
+        if version >= 2:
+            write_json(root / m['selection_history'], snapshot)
+            copy_review = read_json(root / 'evidence/copy-review.json')
+            copy_review.update(angle='Insulation and jacket options', recent_posts_reviewed=[],
+                               distinct_from_recent='First offline fixture, no earlier posts')
+            write_json(root / 'evidence/copy-review.json', copy_review)
         report = inspect_campaign(manifest)
         write_json(root / 'evidence/campaign-validation.json', report)
         write_json(ledger, {'targeted':False,'status':'selected','attempts':[{'url':URL,'status':'selected','manifest':str(manifest)}]})
@@ -74,7 +84,12 @@ class WorkflowTests(unittest.TestCase):
 
     def publication(self, manifest):
         evidence = manifest.parent / 'evidence/facebook-publication.json'
-        write_json(evidence, {'target_url':TARGET_URL,'post_url':POST,'verified_at':now(),'author_matches':True,'text_matches':True,'product_link_matches':True,'image_matches':True,'evidence_file':'evidence/test-observation.txt','notes':'Offline fixture only'})
+        data = {'target_url':TARGET_URL,'post_url':POST,'verified_at':now(),'author_matches':True,'text_matches':True,'image_matches':True,'evidence_file':'evidence/test-observation.txt','notes':'Offline fixture only'}
+        if read_json(manifest).get('version', 1) >= 3:
+            data.update(product_matches=True, no_website_links=True)
+        else:
+            data['product_link_matches'] = True
+        write_json(evidence, data)
         return evidence
 
     def reporting(self, manifest, change=None):
@@ -128,8 +143,49 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(read_json(self.root / 'catalog.json')['status'], 'blocked')
 
     def test_copy_structure(self):
-        self.assertGreaterEqual(validate_copy(COPY, URL)['body_words'], 80)
-        with self.assertRaises(ValueError): validate_copy(COPY.replace(URL, TARGET_URL), URL)
+        self.assertGreaterEqual(validate_copy(COPY, URL, version=2)['body_words'], 80)
+        with self.assertRaises(ValueError): validate_copy(COPY.replace(URL, TARGET_URL), URL, version=2)
+
+    def test_link_free_copy_preserves_body_format_and_rejects_website_addresses(self):
+        metrics = validate_copy(LINK_FREE_COPY, URL)
+        self.assertEqual(metrics, validate_copy(COPY, URL, version=2))
+        for link in (URL, TARGET_URL, 'http://example.com', 'www.delancable.com',
+                     'en.delancable.com/product/36225', 'DELAN.com', '//example.com/path',
+                     '[details](https://example.com)', 'https://bit.ly/example'):
+            text = LINK_FREE_COPY.replace('Contact Delan Cable', 'Visit ' + link + '. Contact Delan Cable')
+            with self.subTest(link=link), self.assertRaisesRegex(ValueError, 'must not contain website'):
+                validate_copy(text, URL)
+        for text in (LINK_FREE_COPY.replace('🔌', '', 1),
+                     LINK_FREE_COPY.replace('#CableSelection', ''),
+                     LINK_FREE_COPY.replace('Contact Delan Cable', '🔌 Contact Delan Cable')):
+            with self.subTest(text=text), self.assertRaises(ValueError): validate_copy(text, URL)
+        with self.assertRaises(ValueError): validate_copy(LINK_FREE_COPY, URL, version=2)
+
+    def test_link_free_publication_reporting_and_history(self):
+        manifest = self.campaign(version=3)
+        update(manifest, 'pending', submission_started=True)
+        update(manifest, 'published', url=POST, evidence=self.publication(manifest))
+        self.assertEqual(plan(manifest)['values'][2:], ['不适用', POST, '不适用'])
+        record(manifest, 'reported', self.reporting(manifest))
+        self.assertEqual(complete(manifest)['status'], 'complete')
+        source = self.sheet_source([['en.delancable.com', 'date', '不适用', POST, '不适用']])
+        history = build_history(self.root, source)
+        self.assertEqual(history['status'], 'ready')
+        self.assertEqual(history['excluded_product_urls'], [URL])
+        self.assertEqual(history['records'][0]['copy'], LINK_FREE_COPY)
+        with self.assertRaises(ValueError): check_copy_novelty(LINK_FREE_COPY, [{'copy': COPY}])
+
+    def test_link_free_publication_requires_identity_and_absence_of_links(self):
+        manifest = self.campaign(version=3)
+        update(manifest, 'pending', submission_started=True)
+        for key in ('product_matches', 'no_website_links'):
+            evidence = self.publication(manifest)
+            data = read_json(evidence)
+            data.pop(key)
+            data['product_link_matches'] = True  # Legacy evidence cannot satisfy the new checks.
+            write_json(evidence, data)
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, 'not been fully verified'):
+                update(manifest, 'published', url=POST, evidence=evidence)
 
     def test_minimum_image_size(self):
         path = self.root / 'small.webp'
@@ -356,7 +412,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(result['copy']['feature_lines'],4)
         self.assertEqual(result['copy']['hashtags'],8)
         self.assertIn(d['selection_history'],result['hashes'])
-        with self.assertRaises(ValueError):validate_copy(COPY.replace('🔌','',1),URL)
+        with self.assertRaises(ValueError):validate_copy(COPY.replace('🔌','',1),URL,version=2)
         write_json(m.parent/'evidence/campaign-validation.json',result)
         update(m,'pending',submission_started=True)
         rec=m.parent/'evidence/reconciliation.json'

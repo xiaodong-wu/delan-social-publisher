@@ -1,4 +1,4 @@
 interface:
   display_name: "德缆 Facebook 自动发布"
   short_description: "先查历史优先选未发布德缆产品，保留文案格式，发布 Facebook 并回写表格"
-  default_prompt: "使用 $delan-social-publisher 先检查历史再随机选未发布产品，保留原文案格式并减少套话，可选 AI 标签默认关闭，清理图片元数据；预检后发布 Facebook、回写表格并返回清单。"
+  default_prompt: "使用 $delan-social-publisher 先检查历史再随机选未发布产品，社媒正文不带网站链接，其余文案格式保留并减少套话，可选 AI 标签默认关闭，清理图片元数据；预检后发布 Facebook、回写表格并返回清单。"

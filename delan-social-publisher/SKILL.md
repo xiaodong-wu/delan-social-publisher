@@ -53,7 +53,7 @@ python3 scripts/scrape_product.py --retry-from MANIFEST --reason '具体的产�
 
 阅读 [references/content-spec.md](references/content-spec.md)。
 
-1. 保留原本格式写 `facebook.txt`：80–150 个英文词，四行 emoji 功能介绍、短收益段落、B2B 询盘 CTA、独占一行的完整产品链接、8–12 个相关标签。先读历史快照中最近最多五篇正文，在原格式内围绕本产品选型问题调整事实顺序、措辞、收益解释和 CTA，不只替换型号或同义词。
+1. 写 `facebook.txt`：80–150 个英文词，保留四行 emoji 功能介绍、短收益段落、B2B 询盘 CTA、8–12 个相关标签的原有格式，仅移除原产品链接行。社媒正文不包含任何网站链接、www 地址或裸域名，也不添加链接预览卡片；官网产品 URL 仍保留在本地产品记录、历史去重和交付报告中。先读历史快照中最近最多五篇正文，在原格式内围绕本产品选型问题调整事实顺序、措辞、收益解释和 CTA，不只替换型号或同义词。
 2. 使用产品类型、结构、用途中的已核实词语自然表达，不套用轮胎汽配词汇；无需生成站内 SEO 文章或文章关键词密度计划。
 3. 填写 `evidence/copy-review.json`，将每个事实声明关联到事实 ID 或标题，检查数字和可选条件，并记录 `angle`、`recent_posts_reviewed` 和 `distinct_from_recent`。示例见内容规范。
 4. 以查看过的主图为身份参考，用 `imagegen` 生成一张 1:1 四宫格社媒图；不生成封面或文章配图。保持线芯数量、配色、屏蔽、护套、端部结构和可见型号一致。不得凭空生成接头、认证标志或应用场景。
@@ -83,7 +83,7 @@ Live 运行按 [references/publishing.md](references/publishing.md) 核实编辑
 python3 scripts/update_manifest.py MANIFEST --status pending --submission-started
 ```
 
-标记写入成功后仅点击一次发布。到主页时间线或已发布内容列表核对作者、文案、产品链接和图片，打开公开永久链接，保存截图及 `evidence/facebook-publication.json`，再记录：
+标记写入成功后仅点击一次发布。到主页时间线或已发布内容列表核对作者、文案、产品身份和图片，确认正文没有网站链接或链接预览卡片，打开公开永久链接，保存截图及 `evidence/facebook-publication.json`，再记录：
 
 ```bash
 python3 scripts/update_manifest.py MANIFEST --status published --url PUBLIC_POST_URL \

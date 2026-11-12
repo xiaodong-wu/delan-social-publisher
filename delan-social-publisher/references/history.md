@@ -24,7 +24,7 @@ python3 scripts/publication_history.py --output-root /absolute/path/to/campaign-
   --output /absolute/path/to/history.json
 ```
 
-4. 表格 C 列仍是“不适用”，不能当产品链接。脚本用 D 列帖子链接关联本地 manifest 的产品。`unresolved_posts` 非空时，打开列出的永久帖子核实作者和正文产品链接，保存正文和截图，在源文件 `post_mappings` 增加：
+4. 表格 C 列仍是“不适用”，不能当产品链接。脚本用 D 列帖子链接关联本地 manifest 的产品，正文没有网站链接也可正常去重，因此须保留本地运行目录。`unresolved_posts` 非空时，先恢复或查找对应的本地 manifest、正文和发布证据，再重建历史。若只能读取带产品链接的旧帖，打开永久帖子核实作者和正文产品链接，保存正文和截图，在源文件 `post_mappings` 增加：
 
 ```json
 {
@@ -38,7 +38,7 @@ python3 scripts/publication_history.py --output-root /absolute/path/to/campaign-
 }
 ```
 
-无法读取、没有唯一产品链接、身份不明或映射矛盾时停止，不能猜型号。映射可复用已有证据，但每次表格读取必须新鲜。
+无链接帖子缺少可靠本地映射、旧帖没有唯一产品链接、无法读取、身份不明或映射矛盾时停止，不能仅凭相似名称或图片猜型号，也不能为补映射改写已发布帖子。映射可复用已有证据，但每次表格读取必须新鲜。
 
 5. 再运行合并脚本，必须输出 `ready`。在 30 分钟内传给 `scrape_product.py --history FILE`；脚本记录完整目录、历史排除列表、本次候选及历史快照。产品按官网数字 ID 比较，忽略追踪参数和尾斜杠；不同 ID 的同名产品分别保留。
 

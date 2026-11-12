@@ -211,7 +211,7 @@ def prepare_run(root, product, raw, image_data, suffix, ledger, mode, history=No
     write_json(run / 'evidence/product-review.json', {'status': 'pending', 'usable_fact_ids': [], 'conflicts': product['conflicts'], 'notes': ''})
     if history is not None:
         write_json(run / 'evidence/selection-history.json', history)
-    manifest = {'version': 2, 'skill': SKILL, 'run_id': run.name, 'mode': mode,
+    manifest = {'version': 3, 'skill': SKILL, 'run_id': run.name, 'mode': mode,
                 'created_at': now(), 'status': 'prepared', 'target_url': TARGET_URL,
                 'product': {'title': product['title'], 'canonical_url': product['canonical_url']},
                 'artifacts': {'product': 'product.json', 'source_html': 'source/page.html', 'source_hero': hero,

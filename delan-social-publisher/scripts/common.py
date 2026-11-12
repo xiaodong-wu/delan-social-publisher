@@ -105,7 +105,12 @@ def checked_publication(root, manifest, url, evidence_path):
     validate_permalink(url, str(preflight.get('observed_page_id', '')))
     if data.get('post_url') != url or not data.get('notes'):
         raise ValueError('Publication evidence must match the exact post URL and include notes')
-    if any(data.get(k) is not True for k in ['author_matches', 'text_matches', 'product_link_matches', 'image_matches']):
+    required = ['author_matches', 'text_matches', 'image_matches']
+    if manifest.get('version', 1) >= 3:
+        required += ['product_matches', 'no_website_links']
+    else:
+        required.append('product_link_matches')
+    if any(data.get(k) is not True for k in required):
         raise ValueError('Publication has not been fully verified')
     verified = timestamp(data.get('verified_at', ''))
     if verified < timestamp(manifest['submission_started_at']):

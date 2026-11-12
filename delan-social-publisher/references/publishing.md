@@ -30,16 +30,18 @@ Live 生成前及最终提交前都检查指定主页的 URL、可见 DLFLEX / D
 
 1. 读取并通过 `validate_campaign.py`；确认文件未被改动。
 2. 在目标主页打开创建帖子，粘贴 `facebook.txt` 全文并上传 `social-upload.jpg`。WebP 是归档素材，JPEG 是浏览器传输衍生件。
-3. 检查预览的身份、完整文案、图片四宫格、无残留其他草稿。
+3. 检查预览的身份、完整文案、图片四宫格、无残留其他草稿；新批次正文不得有网站链接或链接预览卡片。
 4. 按 [history.md](history.md) 刷新历史预检，再运行 `update_manifest.py MANIFEST --status pending --submission-started`。脚本在共享根目录锁下重查同产品占用，只有标记成功才点击最终发布一次。
-5. 等待平台结果，打开目标主页时间线或 Meta 已发布内容列表，检查作者、产品链接、全文、图片和时间。取得并打开公开帖子永久链接；仅有 toast、编辑器关闭、草稿或排期成功都不算已发布。
+5. 等待平台结果，打开目标主页时间线或 Meta 已发布内容列表，检查作者、产品身份、全文、图片和时间，确认无网站链接及链接预览卡片。以文案中的产品名/规格和图片对照本批次 manifest、已审阅产品事实及素材，不能靠正文链接判断产品。取得并打开公开帖子永久链接；仅有 toast、编辑器关闭、草稿或排期成功都不算已发布。
 6. 写 `evidence/facebook-publication.json` 后记录 `published`，运行 `validate_completion.py`。不要在此流程发布站内内容或其他社交渠道。
 
 发布证据格式（截图及文件均相对运行目录）：
 
 ```json
-{"target_url":"https://www.facebook.com/dlflexdelancable","post_url":"实际公开永久链接","verified_at":"ISO-8601 timestamp","author_matches":true,"text_matches":true,"product_link_matches":true,"image_matches":true,"evidence_file":"evidence/facebook-published.png","notes":"记录公开页面或已发布内容库核对结果及作者身份依据"}
+{"target_url":"https://www.facebook.com/dlflexdelancable","post_url":"实际公开永久链接","verified_at":"ISO-8601 timestamp","author_matches":true,"text_matches":true,"product_matches":true,"no_website_links":true,"image_matches":true,"evidence_file":"evidence/facebook-published.png","notes":"记录作者、正文产品名/规格和图片与本批次的对应关系，并确认正文无网站链接及链接预览卡片"}
 ```
+
+以上格式适用于新建 version 3 批次。`no_website_links` 只有观察到公开正文和预览确实无网站链接时才设为 true。version 1/2 已提交旧批次继续要求原 `product_link_matches: true` 证据；不修改旧文案、manifest 版本或冻结哈希来适配新规则。
 
 URL 可为该用户名下 `/posts/...`、已核实同主页数字 ID 下 `/posts/...`，或含 `story_fbid` 和 `id` 的 `permalink.php` / `story.php`。如果平台给出不同形式，打开并取得可核对的永久链接；不得保存主页、登录页、编辑器、分享跳转或随意改写 URL。脚本检查 URL 形态，实际作者对应关系必须由当前平台证据确认。
 

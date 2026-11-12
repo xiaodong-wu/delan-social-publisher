@@ -13,17 +13,21 @@ from publication_history import check_history, check_copy_novelty
 WORD = re.compile(r"[A-Za-z]+(?:[-'][A-Za-z]+)*")
 TAG = re.compile(r'#[A-Za-z][A-Za-z0-9_]*')
 EMOJI = ('🏭', '📦', '🛠', '⚙', '🔧', '✅', '💡', '📏', '🔌', '⚡', '🧵', '🛡', '🔗', '🔬', '🤖', '🔄')
+WEBSITE = re.compile(r'(?:\b(?:https?|ftp)://\S+|\bwww\.\S+|'
+                     r'(?<![\w@.-])(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?![\w-]))', re.I)
 
 
-def validate_copy(text, url, version=2):
+def validate_copy(text, url, version=3):
     lines = [line.strip() for line in text.strip().splitlines() if line.strip()]
-    if len(lines) < 3:
-        raise ValueError('Include a substantive body, a product URL and hashtags')
-    if len(lines) < 8 or not all(line.startswith(EMOJI) for line in lines[:4]):
-        raise ValueError('Start with exactly four emoji feature lines, then benefit, CTA, URL, hashtags')
+    link_free = version >= 3
+    if len(lines) < (7 if link_free else 8) or not all(line.startswith(EMOJI) for line in lines[:4]):
+        raise ValueError('Start with exactly four emoji feature lines, then benefit, CTA and hashtags'
+                         + ('' if link_free else ', with the legacy product URL before hashtags'))
     if any(line.startswith(EMOJI) for line in lines[4:]):
         raise ValueError('Only four feature lines are allowed')
-    if lines[-2] != url or re.findall(r'https?://\S+', text) != [url]:
+    if link_free and WEBSITE.search(text):
+        raise ValueError('Social copy must not contain website links, www addresses or bare domains')
+    if not link_free and (lines[-2] != url or re.findall(r'https?://\S+', text) != [url]):
         raise ValueError('The sole URL must be the selected product link on the penultimate nonempty line')
     tags = TAG.findall(lines[-1])
     min_tags, max_tags = 8, 12
@@ -31,11 +35,12 @@ def validate_copy(text, url, version=2):
         raise ValueError(f'Last line must contain {min_tags}–{max_tags} unique English hashtags')
     if TAG.search('\n'.join(lines[:-1])):
         raise ValueError('Keep all hashtags on the final line')
-    words = len(WORD.findall('\n'.join(lines[:-2])))
+    body = lines[:-1] if link_free else lines[:-2]
+    words = len(WORD.findall('\n'.join(body)))
     lo, hi = 80, 150
     if not lo <= words <= hi or re.search(r'[\u3400-\u9fff]', text):
         raise ValueError(f'Copy must have {lo}–{hi} English body words, excluding URL/hashtags; found {words}')
-    return {'body_words': words, 'feature_lines': sum(line.startswith(EMOJI) for line in lines[:-2]), 'hashtags': len(tags)}
+    return {'body_words': words, 'feature_lines': sum(line.startswith(EMOJI) for line in body), 'hashtags': len(tags)}
 
 
 def review(root, name):
