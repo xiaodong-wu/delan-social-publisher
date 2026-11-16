@@ -5,6 +5,7 @@
 - 产品目录：[en.delancable.com/product](https://en.delancable.com/product)
 - 发布主页：[dlflexdelancable](https://www.facebook.com/dlflexdelancable)
 - 仅发布 Facebook，不包含站内文章或 LinkedIn。
+- Facebook 发布统一通过浏览器插件操作已登录的 Chrome 会话，涵盖身份检查、内容填写、图片上传、提交和公开结果核验；插件不可用时停止并报告，不改用其他发布方式。Google 表格仍使用 Sheets 连接器。
 - 支持 `dry-run`、候选筛选、同批次续跑、提交结果核对和防重复发布。
 - 每次选品先合并本地发布历史与实时 Google 表格，优先从未发布产品中随机选择；已提交但结果未定的产品也排除。没有新产品时停止，不自动循环复发。
 - 社媒正文不带网站链接，仅移除原产品链接行；保留其他文案格式，在固定结构内根据最近五篇内容改变切入点、措辞、收益解释和 CTA。
@@ -21,7 +22,7 @@
 git clone https://github.com/xiaodong-wu/delan-social-publisher.git
 ```
 
-本技能需要 Python 3.9+、Pillow，以及 Codex 中可用的 `imagegen` 技能和受支持的浏览器控制或发布连接器。脚本使用 Unix 文件锁，适用于 macOS/Linux。真实发布还需要目标 Facebook 主页的登录会话和发帖权限。仓库不包含账号、密钥、浏览器会话或发布记录。
+本技能需要 Python 3.9+、Pillow，以及 Codex 中可用的 `imagegen` 技能、已连接 Chrome 扩展的浏览器插件工具（如 `mcp__cua_repl`）和 Google Sheets 连接器。脚本使用 Unix 文件锁，适用于 macOS/Linux。真实发布还需要目标 Facebook 主页的登录会话和发帖权限。仓库不包含账号、密钥、浏览器会话或发布记录。
 
 ```bash
 python3 -m pip install Pillow
@@ -32,7 +33,7 @@ python3 -m pip install Pillow
 在 Codex 中调用：
 
 ```text
-使用 $delan-social-publisher 先检查历史记录，再随机选择一个未发布的德缆官网产品。社媒正文不带网站链接，其余文案格式保留，减少重复套话；可选 AI 标签默认关闭。预检通过后直接发布、回写表格并返回发布清单。
+使用 $delan-social-publisher 先检查历史记录，再随机选择一个未发布的德缆官网产品。社媒正文不带网站链接，其余文案格式保留，减少重复套话；可选 AI 标签默认关闭。预检通过后通过浏览器插件操作已登录的 Chrome 直接发布 Facebook、回写表格并返回发布清单。
 ```
 
 仅准备素材、验证而不发布：

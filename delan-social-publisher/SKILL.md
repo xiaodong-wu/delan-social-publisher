@@ -1,6 +1,6 @@
 ---
 name: delan-social-publisher
-description: 为德缆 DLFLEX / Delan Cable 从官网随机或指定选品，生成有依据的英文文案与四宫格图片，发布到 Facebook 主页 dlflexdelancable 并回写 Google 发布记录表。用于产品发布、素材预演、明确批次续跑或已发布帖子的表格补录；不含站内文章或 LinkedIn 发布。
+description: 为德缆 DLFLEX / Delan Cable 从官网随机或指定选品，生成有依据的英文文案与四宫格图片，通过浏览器插件发布到 Facebook 主页 dlflexdelancable 并回写 Google 发布记录表。用于产品发布、素材预演、明确批次续跑或已发布帖子的表格补录；不含站内文章或 LinkedIn 发布。
 ---
 
 # 德缆 Facebook 自动发布
@@ -17,7 +17,7 @@ description: 为德缆 DLFLEX / Delan Cable 从官网随机或指定选品，生
 
 ### 1. 预检
 
-阅读 [references/publishing.md](references/publishing.md)。先查询可用发布连接器；没有合适连接器时，使用当前受支持的浏览器工具及其返回文档，优先复用已登录的 Chrome 会话。不要导入旧版浏览器运行时。
+阅读 [references/publishing.md](references/publishing.md)。Facebook 内容发布统一使用当前会话提供的浏览器插件工具（如 `mcp__cua_repl`），通过 Chrome 扩展连接操作已登录的浏览器会话，按工具返回文档进行身份检查、填写、上传、提交及公开结果核验。插件不可用或未连接时停止并报告所需操作，不改用发布 API、社媒连接器或独立浏览器自动化会话。Google 表格读取与回写继续使用原有 Sheets 连接器。
 
 Live 运行在生成图片前打开指定主页，核实主页 URL、可见品牌、当前发布身份与创建帖子权限。主页数字 ID 未预设；若平台重定向到数字 ID，必须通过当前页面证据确认与 `dlflexdelancable` 对应并记录，不得借用其他品牌 ID。允许一次明确的主页身份切换及其确认。遇到登录、MFA、CAPTCHA、身份歧义或权限不足立即停止。
 
@@ -112,7 +112,7 @@ python3 scripts/validate_completion.py MANIFEST
 
 报告另列历史排除数量、文案切入点、实际 AI 标签状态及正式 WebP/上传 JPEG 的元数据检查结果。修改技能本身不触发发帖，不修改既有帖子。
 
-脚本路径均相对本技能目录。Python 3.9+；图片处理需要 Pillow，其余仅用标准库。所有脚本只读官网或处理本地文件；实际发布由受支持连接器或浏览器完成。
+脚本路径均相对本技能目录。Python 3.9+；图片处理需要 Pillow，其余仅用标准库。所有脚本只读官网或处理本地文件；实际 Facebook 发布通过浏览器插件操作已登录的浏览器完成。
 
 ```bash
 python3 scripts/update_manifest.py MANIFEST --status blocked --error '具体阻塞原因'
