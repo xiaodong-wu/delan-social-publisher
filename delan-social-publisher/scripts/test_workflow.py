@@ -67,7 +67,7 @@ class WorkflowTests(unittest.TestCase):
             {'text':'HDPE insulation','fact_ids':['f02']}, {'text':'TPU jacket','fact_ids':['f04']}]})
         write_json(root / 'evidence/image-review.json', {'status':'approved','reviewed_at':now(), 'notes':'Synthetic fixture, not a real image review', 'source':'source/hero.png','final':'social.webp','panels':4,'material_issues':[], 'attempt_count':1,'versions':[{'path':'generated-social.png','outcome':'accepted'}]})
         (root / 'evidence/test-observation.txt').write_text('Offline simulated observation; no platform was contacted.')
-        write_json(root / 'evidence/preflight.json', {'target_url':TARGET_URL, 'checked_at':now(), 'identity_confirmed':True,'can_create_post':True,'active_identity':'Fixture Delan', 'observed_page_id':'123456789','evidence_file':'evidence/test-observation.txt', 'ai_label':{'value':'off','reason':'Synthetic optional-off UI observation'}})
+        write_json(root / 'evidence/preflight.json', {'target_url':TARGET_URL, 'checked_at':now(), 'identity_confirmed':True,'can_create_post':True,'active_identity':'Dlflex Delan Cable', 'observed_page_id':'123456789','evidence_file':'evidence/test-observation.txt', 'ai_label':{'value':'off','reason':'Synthetic optional-off UI observation'}})
         snapshot = build_history(self.root)
         snapshot.update(coverage='local_and_sheet', sheet_checked_at=now())
         write_json(root / 'evidence/history-preflight.json', snapshot)
@@ -215,6 +215,31 @@ class WorkflowTests(unittest.TestCase):
         evidence = read_json(path); evidence['target_url'] = 'https://www.facebook.com/other'
         write_json(path, evidence)
         with self.assertRaises(ValueError): update(manifest, 'pending', submission_started=True)
+
+    def test_target_page_with_wrong_composer_author_does_not_reserve_product(self):
+        manifest = self.campaign(version=3)
+        before = read_json(manifest)
+        path = manifest.parent / 'evidence/preflight.json'
+        evidence = read_json(path)
+        for author in ('Other Company', 'Dlflex Delan Cable Distributor', None):
+            with self.subTest(author=author):
+                evidence['active_identity'] = author
+                write_json(path, evidence)
+                with self.assertRaisesRegex(ValueError, 'composer'):
+                    update(manifest, 'pending', submission_started=True)
+                self.assertEqual(read_json(manifest), before)
+
+        evidence['active_identity'] = 'DLFLEX\u00a0 Delan Cable '
+        write_json(path, evidence)
+        self.assertEqual(update(manifest, 'pending', submission_started=True)['submission_count'], 1)
+
+    def test_composer_showing_the_page_handle_can_submit(self):
+        manifest = self.campaign(version=3)
+        path = manifest.parent / 'evidence/preflight.json'
+        evidence = read_json(path)
+        evidence['active_identity'] = '@dlflexdelancable'
+        write_json(path, evidence)
+        self.assertEqual(update(manifest, 'pending', submission_started=True)['submission_count'], 1)
 
     def test_submission_disables_reselection_and_speculative_retry(self):
         manifest = self.campaign()

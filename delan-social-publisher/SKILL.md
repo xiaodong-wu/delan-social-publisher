@@ -19,7 +19,7 @@ description: 为德缆 DLFLEX / Delan Cable 从官网随机或指定选品，生
 
 阅读 [references/publishing.md](references/publishing.md)。Facebook 内容发布统一使用当前会话提供的浏览器插件工具（如 `mcp__cua_repl`），通过 Chrome 扩展连接操作已登录的浏览器会话，按工具返回文档进行身份检查、填写、上传、提交及公开结果核验。插件不可用或未连接时停止并报告所需操作，不改用发布 API、社媒连接器或独立浏览器自动化会话。Google 表格读取与回写继续使用原有 Sheets 连接器。
 
-Live 运行在生成图片前打开指定主页，核实主页 URL、可见品牌、当前发布身份与创建帖子权限。主页数字 ID 未预设；若平台重定向到数字 ID，必须通过当前页面证据确认与 `dlflexdelancable` 对应并记录，不得借用其他品牌 ID。允许一次明确的主页身份切换及其确认。遇到登录、MFA、CAPTCHA、身份歧义或权限不足立即停止。
+Live 运行在生成图片前从当前 Chrome 扩展打开指定主页，分别核实正在浏览的主页、实际操作身份和创建帖子权限。允许一次明确指向德缆的主页切换及其确认。最终预检从发帖编辑器读取作者署名，按[浏览器识别与提交步骤](references/publishing.md)定位上传、预览及公开帖子。遇到登录、MFA、CAPTCHA、身份歧义或权限不足立即停止。
 
 确认输出目录和图像生成工具可用。Live 运行同时读取 [references/reporting.md](references/reporting.md)，检查表格访问与五列表头。`dry-run` 不要求 Facebook 登录，不打开发布编辑器，不执行提交或表格写入；其余取证、文案和图片检查相同。图像生成前加载已安装的 `imagegen` 技能。
 

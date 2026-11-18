@@ -43,8 +43,12 @@ def update(path, status, url=None, error=None, submission_started=False, evidenc
             preflight = read_json(local_file(root, 'evidence/preflight.json'))
             check_target_evidence(root, preflight)
             recent(preflight.get('checked_at', ''))
-            if preflight.get('identity_confirmed') is not True or preflight.get('can_create_post') is not True or not preflight.get('active_identity'):
+            if preflight.get('identity_confirmed') is not True or preflight.get('can_create_post') is not True:
                 raise ValueError('Current target identity and posting permission must be confirmed')
+            author = preflight.get('active_identity')
+            name = ' '.join(author.split()).casefold() if isinstance(author, str) else ''
+            if name not in {'dlflex delan cable', 'dlflexdelancable', '@dlflexdelancable'}:
+                raise ValueError('The Facebook composer must show the Delan page as the posting identity')
             prior = [e for e in data.get('history', []) if e.get('submission_started_at')]
             if len(prior) >= 2:
                 raise ValueError('At most one reconciled retry is allowed')
